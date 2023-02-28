@@ -41,12 +41,6 @@ INSERT INTO public.config (id, value, options, created_at, updated_at) VALUES
 INSERT INTO public.config (id, value, options, created_at, updated_at) VALUES
     ('invitation-key', null, null, now(), now());
 
--- Set owner
-ALTER TABLE public.sites OWNER TO supabase_admin;
-ALTER TABLE public.users OWNER TO supabase_admin;
-ALTER TABLE public.hosts OWNER TO supabase_admin;
-ALTER TABLE public.config OWNER TO supabase_admin;
-
 
 -- Auto-generate row ID
 
@@ -153,7 +147,6 @@ CREATE FUNCTION "public"."remove_active_editor"("site" "text") RETURNS smallint
     return num_affected;
 $_$;
 
-ALTER FUNCTION "public"."remove_active_editor"("site" "text") OWNER TO "supabase_admin";
 GRANT ALL ON FUNCTION "public"."remove_active_editor"("site" "text") TO "postgres";
 GRANT ALL ON FUNCTION "public"."remove_active_editor"("site" "text") TO "anon";
 GRANT ALL ON FUNCTION "public"."remove_active_editor"("site" "text") TO "authenticated";

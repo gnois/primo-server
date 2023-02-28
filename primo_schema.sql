@@ -6,6 +6,8 @@ CREATE TABLE public.sites (
     name text,
     password text,
     active_editor text,
+    host text,
+    active_deployment jsonb,
     created_at timestamp with time zone DEFAULT now()
 );
 
@@ -13,6 +15,7 @@ CREATE TABLE public.users (
     id bigint NOT NULL,
     email text,
     role text,
+    sites text[],
     created_at timestamp with time zone DEFAULT now(),
     updated_at timestamp with time zone DEFAULT now()
 );
@@ -28,20 +31,15 @@ CREATE TABLE public.hosts (
 CREATE TABLE public.config (
     id text NOT NULL,
     value text,
+    options jsonb,
     created_at timestamp with time zone DEFAULT now(),
     updated_at timestamp with time zone DEFAULT now()
 );
 
-INSERT INTO public.config (id, value, created_at, updated_at) VALUES
-    ('server-token', null, now(), now());
-INSERT INTO public.config (id, value, created_at, updated_at) VALUES
-    ('invitation-key', null, now(), now());
-
--- Set owner
-ALTER TABLE public.sites OWNER TO supabase_admin;
-ALTER TABLE public.users OWNER TO supabase_admin;
-ALTER TABLE public.hosts OWNER TO supabase_admin;
-ALTER TABLE public.config OWNER TO supabase_admin;
+INSERT INTO public.config (id, value, options, created_at, updated_at) VALUES
+    ('server-token', null, null, now(), now());
+INSERT INTO public.config (id, value, options, created_at, updated_at) VALUES
+    ('invitation-key', null, null, now(), now());
 
 
 -- Auto-generate row ID
@@ -83,8 +81,9 @@ ALTER TABLE public.config ENABLE ROW LEVEL SECURITY;
 -- Set RLS Policy
 CREATE POLICY "Authenticated users can access sites" ON public.sites FOR ALL USING (auth.role() = 'authenticated') WITH CHECK (auth.role() = 'authenticated');
 CREATE POLICY "Authenticated users can access users" ON public.users FOR ALL USING (auth.role() = 'authenticated') WITH CHECK (auth.role() = 'authenticated');
-CREATE POLICY "Authenticated users can access hosts" ON public.hosts FOR ALL USING (auth.role() = 'authenticated') WITH CHECK (auth.role() = 'authenticated');
 CREATE POLICY "Authenticated users can access config" ON public.config FOR ALL USING (auth.role() = 'authenticated') WITH CHECK (auth.role() = 'authenticated');
+CREATE POLICY "Authenticated users can access hosts" ON public.hosts FOR ALL USING (auth.role() = 'authenticated') WITH CHECK (auth.role() = 'authenticated');
+-- No users can access Hosts (to secure Tokens)
 
 -- Set permissions for tables
 GRANT ALL ON TABLE public.sites TO postgres;
@@ -148,7 +147,6 @@ CREATE FUNCTION "public"."remove_active_editor"("site" "text") RETURNS smallint
     return num_affected;
 $_$;
 
-ALTER FUNCTION "public"."remove_active_editor"("site" "text") OWNER TO "supabase_admin";
 GRANT ALL ON FUNCTION "public"."remove_active_editor"("site" "text") TO "postgres";
 GRANT ALL ON FUNCTION "public"."remove_active_editor"("site" "text") TO "anon";
 GRANT ALL ON FUNCTION "public"."remove_active_editor"("site" "text") TO "authenticated";

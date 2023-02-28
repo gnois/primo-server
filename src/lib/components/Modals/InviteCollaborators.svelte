@@ -1,6 +1,6 @@
 <script>
   import { fade } from 'svelte/transition'
-  import { createUniqueID } from '@primo-app/primo/src/utilities'
+  import { createUniqueID } from '@primo-app/primo/utilities'
   import supabase from '../../../supabase/core'
   import { config, users } from '../../../supabase/db'
   import user from '../../../stores/user'
@@ -17,12 +17,22 @@
   $: roleName = RoleLabel(role)
 
   let collaborators = []
+  let site_collaborators = []
 
   fetchServerUsers()
-  supabase.from('users').on('*', fetchServerUsers).subscribe()
+  supabase
+    .channel('*')
+    .on(
+      'postgres_changes',
+      { event: '*', schema: 'public', tables: 'users' },
+      fetchServerUsers
+    )
+    .subscribe()
+
   async function fetchServerUsers() {
     const data = await users.get()
-    collaborators = data
+    collaborators = data.filter((u) => u.sites === null) // only show users w/ access to all sites
+    site_collaborators = data.filter((u) => u.sites)
   }
 
   let key = ''
@@ -35,7 +45,10 @@
 
   async function resetKey() {
     key = createUniqueID(15)
-    config.update('invitation-key', key)
+    config.update({
+      id: 'invitation-key',
+      value: key,
+    })
     copied = false
   }
 
@@ -54,7 +67,8 @@
 
   async function updateUserRole(user) {
     if (user.role === 'remove') {
-      users.delete(user.email)
+      await users.delete(user.email)
+      fetchServerUsers()
     } else {
       users.update(user.email, {
         role: user.role,
@@ -100,10 +114,10 @@
     </div>
   </section>
   <section>
-    <h2>Existing Collaborators</h2>
+    <h2>Server Members</h2>
     <ul>
       {#each collaborators as collaborator}
-        <li in:fade>
+        <li>
           <div>
             <div
               class="profile"
@@ -135,6 +149,40 @@
         </li>
       {/each}
     </ul>
+    {#if site_collaborators.length > 0}
+      <hr />
+      <h2>Site Members</h2>
+      <ul>
+        {#each site_collaborators as collaborator}
+          <li>
+            <div>
+              <div
+                class="profile"
+                style="background-color: #{Math.floor(
+                  collaborator.email.length * 16777215
+                ).toString(16)}"
+              >
+                <span>{collaborator.email.slice(0, 2)}</span>
+              </div>
+              <span class="email">{collaborator.email}</span>
+              <span class="sites">{collaborator.sites.join(', ')}</span>
+            </div>
+            {#if $user.admin}
+              <select
+                bind:value={collaborator.role}
+                disabled={collaborator.role === 'admin'}
+                on:change={() => updateUserRole(collaborator)}
+              >
+                <option value="developer" selected>Developer</option>
+                <option value="content">Content Editor</option>
+                <option disabled>───────</option>
+                <option value="remove">Remove</option>
+              </select>
+            {/if}
+          </li>
+        {/each}
+      </ul>
+    {/if}
   </section>
 </main>
 
@@ -188,7 +236,7 @@
 
       button {
         padding: 0.5rem 1rem;
-        background: var(--primo-color-primored);
+        background: var(--primo-color-brand);
         border-radius: 0.25rem;
         margin-left: 0.5rem;
 
@@ -210,9 +258,23 @@
       }
     }
 
+    hr {
+      border-color: var(--color-gray-8);
+      margin: 2rem 0;
+    }
+
     ul {
       display: grid;
       gap: 0.75rem;
+
+      .email {
+        font-weight: 500;
+        &:after {
+          content: '|';
+          margin-left: 1rem;
+          font-weight: 700;
+        }
+      }
 
       li {
         display: flex;

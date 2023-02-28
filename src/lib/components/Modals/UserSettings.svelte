@@ -1,11 +1,18 @@
 <script>
+  import { cloneDeep as _cloneDeep } from 'lodash-es'
   import { onMount } from 'svelte'
-  import { createUniqueID } from '@primo-app/primo/src/utilities'
+  import { createUniqueID } from '@primo-app/primo/utilities'
   import Tabs from '$lib/ui/Tabs.svelte'
   import PrimaryButton from '$lib/ui/PrimaryButton.svelte'
   import CopyButton from '$lib/ui/CopyButton.svelte'
   import Hosting from '../Hosting.svelte'
   import * as supabaseDB from '../../../supabase/db'
+  import { setCustomization } from '../../../actions'
+  import config from '../../../stores/config'
+  import ImageField from '../../../extensions/FieldTypes/ImageField.svelte'
+  import RepeaterField from '@primo-app/primo/field-types/RepeaterField.svelte'
+  import Link from '@primo-app/primo/field-types/Link.svelte'
+  import TextField from '@primo-app/primo/field-types/ContentField.svelte'
 
   const tabs = [
     {
@@ -16,20 +23,28 @@
       label: 'Server',
       icon: 'server',
     },
+    {
+      label: 'Customize',
+      icon: 'palette',
+    },
   ]
   let activeTab = tabs[0]
 
   let token = null
   async function createToken() {
     const tokenToSet = createUniqueID(25).toUpperCase()
-    const success = await supabaseDB.config.update('server-token', tokenToSet)
+    const success = await supabaseDB.config.update({
+      id: 'server-token',
+      value: tokenToSet,
+    })
     if (success) {
       token = tokenToSet
     }
   }
 
   onMount(async () => {
-    token = await supabaseDB.config.get('server-token')
+    const res = await supabaseDB.config.get('server-token')
+    token = res
   })
 </script>
 
@@ -43,7 +58,7 @@
           internet</span
         >
       </h1>
-      <Hosting showDetails={false} />
+      <Hosting />
     {:else if activeTab.label === 'Server'}
       <h1 class="primo-heading-lg">
         Primo Server
@@ -65,6 +80,66 @@
         {:else}
           <PrimaryButton on:click={createToken}>Create Token</PrimaryButton>
         {/if}
+      </div>
+    {:else if activeTab.label === 'Customize'}
+      <h1 class="primo-heading-lg">Customize</h1>
+      <div>
+        <ImageField
+          on:input={({ detail }) => setCustomization({ logo: detail.value })}
+          field={{
+            label: 'Logo',
+            value: $config.customization.logo,
+          }}
+        />
+        <br /><br />
+        <RepeaterField
+          field={{
+            key: 'footer-links',
+            label: 'Footer Links',
+            fields: [
+              {
+                key: 'link',
+                label: 'Link',
+                type: 'link',
+                value: {
+                  label: '',
+                  url: '',
+                },
+                fields: [],
+              },
+            ],
+            value: $config.customization.links.map((link) => ({ link })),
+          }}
+          on:input={({ detail }) => {
+            setCustomization({
+              links: detail.value.map((subfield) => ({ ...subfield.link })),
+            })
+          }}
+        />
+        <br /><br />
+        <Link
+          field={{
+            key: 'docs',
+            label: 'Documentation Link',
+            value: $config.customization.docs,
+          }}
+          on:input={({ detail }) => {
+            setCustomization({
+              docs: detail.value,
+            })
+          }}
+        />
+        <br /><br />
+        <TextField
+          field={_cloneDeep({
+            label: 'Brand Color',
+            value: $config.customization.color,
+          })}
+          on:input={({ detail }) =>
+            setCustomization({
+              color: detail.value,
+            })}
+        />
       </div>
     {/if}
   </div>
@@ -105,12 +180,6 @@
     & > * {
       margin: 0.5rem 0;
     }
-
-    hr {
-      border-color: var(--color-gray-8);
-      margin: 1.5rem 0;
-    }
-
     --space-y: 1rem;
   }
 </style>

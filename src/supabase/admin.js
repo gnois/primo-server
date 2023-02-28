@@ -1,5 +1,4 @@
 import {createClient} from '@supabase/supabase-js'
-import { buildStaticPage } from '@primo-app/primo/src/stores/helpers'
 import {find as _find} from 'lodash-es'
 
 const supabaseAdmin = createClient(import.meta.env.VITE_SUPABASE_URL, import.meta.env.VITE_SUPABASE_ADMIN_KEY);
@@ -7,7 +6,7 @@ const supabaseAdmin = createClient(import.meta.env.VITE_SUPABASE_URL, import.met
 export async function getServerToken() {
   const {data,error} = await supabaseAdmin
     .from('config')
-    .select('*')
+    .select()
     .eq('id', 'server-token')
   return data[0]['value']
 }
@@ -29,7 +28,6 @@ export async function getNumberOfUsers() {
 }
 
 export async function validateInvitationKey(key) {
-  console.log({key})
   const {data,error} = await supabaseAdmin
     .from('config')
     .select('*')
@@ -38,20 +36,19 @@ export async function validateInvitationKey(key) {
   return !!data[0]
 }
 
-export async function saveSite(updatedSite) {
-  const homepage = _find(updatedSite.pages, ['id', 'index'])
-  const preview = await buildStaticPage({ page: homepage, site: updatedSite })
-  const [ res1, res2 ] = await Promise.all([
+export async function saveSite(updatedSite, updatedPreview) {
+  const [ res1 ] = await Promise.all([
     updateSiteData({
       id: updatedSite.id,
       data: updatedSite
     }),
     updatePagePreview({
-      path: `${updatedSite.id}/preview.html`,
-      preview
+      id: updatedSite.id,
+      preview: updatedPreview
     })
   ])
-  return res1.error || res2.error ? false : true
+
+  return res1.error ? false : true
 
   async function updateSiteData({ id, data }) {
     const json = JSON.stringify(data)
@@ -63,11 +60,11 @@ export async function saveSite(updatedSite) {
       })
   }
 
-  async function updatePagePreview({ path, preview }) {
+  async function updatePagePreview({ id, preview }) {
     return await supabaseAdmin
     .storage
     .from('sites')
-    .update(path, preview, {
+    .update(`${id}/preview.html`, preview, {
       upsert: true
     })
   }

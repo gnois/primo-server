@@ -43,6 +43,17 @@ export async function uploadSiteData({ id, data }) {
   return res
 }
 
+export async function uploadSiteFile({ id, file }) {
+  const path = `${id}/site-files/${file.file}`
+  await supabase
+    .storage
+    .from(bucketID)
+    .upload(path, file.data, {
+      upsert: true
+    })
+  return file.file
+}
+
 export async function updateSiteData({ id, data }) {
   const json = JSON.stringify(data)
   const res = await supabase
@@ -84,7 +95,7 @@ export async function downloadSiteData(id) {
   const {data} = await supabase
     .storage
     .from(bucketID)
-    .download(`${id}/site.json`)
+    .download(`${id}/site.json?${Date.now()}`) // bust the cache (i.e. prevent outdated data)
   const json = await data.text()
   return JSON.parse(json)
 }

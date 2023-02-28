@@ -4,7 +4,7 @@
   import { stores } from '@primo-app/primo'
   import SiteThumbnail from '$lib/components/SiteThumbnail.svelte'
   import Spinner from '$lib/ui/Spinner.svelte'
-  import { setActiveEditor } from '../../supabase/helpers'
+  import { setActiveEditor } from '../../actions'
   const dispatch = createEventDispatcher()
 
   const { saved } = stores
@@ -16,7 +16,7 @@
       )
       e.preventDefault()
     } else {
-      setActiveEditor(site.id, false)
+      setActiveEditor({ siteID: site.id, lock: false })
       dispatch('toggle')
     }
   }
@@ -81,7 +81,7 @@
       transition: 0.1s box-shadow;
 
       &:hover {
-        box-shadow: var(--primo-ring-primored);
+        box-shadow: var(--primo-ring-brand);
       }
 
       a {

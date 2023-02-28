@@ -1,15 +1,16 @@
 <script lang="ts">
-  import { goto } from '$app/navigation'
-  import SignInNav from '$lib/components/SignInNav.svelte'
+  import Icon from '@iconify/svelte'
+  import DashboardToolbar from '$lib/components/DashboardToolbar.svelte'
   import SiteFooter from '$lib/components/SiteFooter.svelte'
   import SiteThumbnail from '$lib/components/SiteThumbnail.svelte'
   import Modal, { show, hide } from '$lib/components/Modal.svelte'
   import sites from '../stores/sites'
   import user from '../stores/user'
   import * as actions from '../actions'
-  // import mixpanel from 'mixpanel-browser'
 
-  // mixpanel.track('Dashboard')
+  export let data
+
+  if (data) actions.setCustomization(data, false)
 
   function beginInvitation(site): void {
     show({
@@ -43,8 +44,11 @@
   }
 
   async function editSite(site) {
-    actions.sites.update(site.id, {
-      name: site.name,
+    actions.sites.update({
+      id: site.id,
+      props: {
+        name: site.name,
+      },
     })
   }
 
@@ -52,88 +56,59 @@
   function showCollaborators(site) {
     // modal.show("COLLABORATORS", { site });
   }
-
-  let hoveredItem = null
 </script>
 
-<Modal />
 <main class="primo-reset">
   {#if $user.signedIn}
     <div class="container">
-      <SignInNav />
+      <DashboardToolbar />
       <div class="sites-container">
         <ul class="sites" xyz="fade stagger stagger-1">
           {#each $sites as site, i (site.id)}
-            <li
-              class="xyz-in"
-              class:active={hoveredItem === i}
-              class:inactive={hoveredItem !== null && hoveredItem !== i}
-            >
-              <a
-                class="site-link"
-                href={site.id}
-                on:mouseenter={() => (hoveredItem = i)}
-                on:mouseleave={() => (hoveredItem = null)}
-              >
+            <li class="xyz-in">
+              <a class="site-link" href={site.id}>
                 <SiteThumbnail {site} />
               </a>
               <div class="site-info">
-                <div>
-                  <div class="site-name">
-                    {#if siteBeingEdited === site.id}
-                      <form
-                        on:submit|preventDefault={() =>
-                          (siteBeingEdited = null)}
-                      >
-                        <input
-                          on:blur={() => (siteBeingEdited = null)}
-                          class="reset-input"
-                          type="text"
-                          bind:value={site.name}
-                        />
-                      </form>
-                    {:else}
-                      <a
-                        href={site.id}
-                        on:mouseenter={() => (hoveredItem = i)}
-                        on:mouseleave={() => (hoveredItem = null)}
-                      >
-                        <span>{site.name}</span>
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          viewBox="0 0 20 20"
-                          fill="currentColor"
+                <div class="site-name">
+                  {#if siteBeingEdited === site.id}
+                    <form
+                      on:submit|preventDefault={() => (siteBeingEdited = null)}
+                    >
+                      <input
+                        on:blur={() => (siteBeingEdited = null)}
+                        class="reset-input"
+                        type="text"
+                        bind:value={site.name}
+                      />
+                    </form>
+                  {:else}
+                    <a data-sveltekit-prefetch href={site.id}>
+                      <span>{site.name}</span>
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        viewBox="0 0 20 20"
+                        fill="currentColor"
+                        class="s-Uap-jPRb-uiE"
+                        ><path
+                          fill-rule="evenodd"
+                          d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z"
+                          clip-rule="evenodd"
                           class="s-Uap-jPRb-uiE"
-                          ><path
-                            fill-rule="evenodd"
-                            d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z"
-                            clip-rule="evenodd"
-                            class="s-Uap-jPRb-uiE"
-                          /></svg
-                        >
-                      </a>
-                    {/if}
-                  </div>
-                  <span class="site-url">{site.id}</span>
+                        /></svg
+                      >
+                    </a>
+                  {/if}
+                </div>
+                <span class="site-url">{site.id}</span>
+                {#if !$user.sites}
                   <div class="buttons">
                     <button
                       on:click={() => beginInvitation(site)}
                       class="site-button"
                     >
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                      >
-                        <path
-                          stroke-linecap="round"
-                          stroke-linejoin="round"
-                          stroke-width="2"
-                          d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"
-                        />
-                      </svg>
-                      <span>Invite</span>
+                      <Icon icon="clarity:users-solid" />
+                      <span>Site Members</span>
                     </button>
                     <button
                       class="site-button"
@@ -172,34 +147,31 @@
                       <span>Delete</span>
                     </button>
                   </div>
-                </div>
+                {/if}
               </div>
             </li>
           {/each}
-          <li
-            class:inactive={hoveredItem !== true && hoveredItem !== null}
-            class:active={hoveredItem === true}
-            on:mouseenter={() => (hoveredItem = true)}
-            on:mouseleave={() => (hoveredItem = null)}
-          >
-            <button class="create-site" on:click={createSite}>
-              {#if loading}
-                <!-- <Spinner /> -->
-              {:else}
-                <svg
-                  fill="currentColor"
-                  viewBox="0 0 20 20"
-                  xmlns="http://www.w3.org/2000/svg"
-                  ><path
-                    fill-rule="evenodd"
-                    d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z"
-                    clip-rule="evenodd"
-                  /></svg
-                >
-              {/if}
-              create a site
-            </button>
-          </li>
+          {#if !$user.sites}
+            <li>
+              <button class="create-site" on:click={createSite}>
+                {#if loading}
+                  <!-- <Spinner /> -->
+                {:else}
+                  <svg
+                    fill="currentColor"
+                    viewBox="0 0 20 20"
+                    xmlns="http://www.w3.org/2000/svg"
+                    ><path
+                      fill-rule="evenodd"
+                      d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z"
+                      clip-rule="evenodd"
+                    /></svg
+                  >
+                {/if}
+                create a site
+              </button>
+            </li>
+          {/if}
         </ul>
       </div>
       <SiteFooter />
@@ -223,26 +195,11 @@
       padding: 2rem;
       min-height: 100vh;
     }
-
-    hr {
-      margin: 2rem 0;
-      border-color: var(--color-gray-9);
-    }
-
     .sites-container {
       display: grid;
       gap: 1rem;
 
-      span.info {
-        padding: 1rem;
-        color: white;
-        background: var(--color-gray-9);
-      }
-
       header {
-        h2 {
-          color: white;
-        }
         a {
           text-decoration: underline;
           color: var(--color-gray-4);
@@ -258,18 +215,22 @@
           border-radius: var(--primo-border-radius);
           overflow: hidden;
           font-size: var(--font-size-4);
-          box-shadow: var(--box-shadow-md);
+          transition: 0.1s box-shadow;
           display: flex;
           flex-direction: column;
           justify-content: flex-start;
-          transition: opacity 0.1s, filter 0.1s;
+          transition: 0.1s box-shadow;
 
-          &.active {
-            filter: brightness(1.1);
+          &:has(a:hover) {
+            box-shadow: var(--primo-ring-brand-thick);
+
+            & ~ li:last-child {
+              box-shadow: var(--primo-ring-brand-thin);
+            }
           }
 
-          &.inactive {
-            opacity: 0.5;
+          &:last-child {
+            box-shadow: var(--primo-ring-brand);
           }
 
           .site-link {
@@ -280,29 +241,25 @@
 
           .site-info {
             color: var(--color-gray-1);
-            display: grid;
-            gap: 0.5rem;
-
-            & > div {
-              display: flex;
-              flex-direction: column;
-              justify-content: flex-start;
-              padding: 1.5rem;
-            }
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-start;
+            padding: 1.5rem;
 
             .site-name {
-              display: flex;
-
               a {
-                display: flex;
+                display: grid;
+                grid-template-columns: auto auto;
+                place-items: center flex-start;
 
                 &:hover {
-                  color: var(--primo-color-primored);
+                  color: var(--primo-color-brand);
                 }
 
                 svg {
                   width: 1.5rem;
                   margin-top: 3px;
+                  justify-self: flex-end;
                 }
               }
 
@@ -318,7 +275,7 @@
                 padding: 0 0.5rem;
 
                 &:hover {
-                  color: var(--primo-color-primored);
+                  color: var(--primo-color-brand);
                 }
 
                 svg {
@@ -344,6 +301,10 @@
 
               button {
                 margin-right: 0.75rem;
+
+                span {
+                  margin-left: 0.25rem;
+                }
               }
             }
           }
@@ -360,8 +321,6 @@
           background: var(--primo-color-black);
           font-weight: 600;
           color: var(--color-gray-2);
-          border-radius: var(--primo-border-radius);
-          border: 2px solid var(--primo-color-primored);
 
           svg {
             border-radius: 50%;
@@ -370,8 +329,9 @@
             width: 2rem;
           }
 
-          &:hover svg {
-            color: var(--primo-color-primored);
+          &:active {
+            background: var(--primo-color-brand);
+            color: var(--primo-color-black);
           }
         }
       }
@@ -390,14 +350,18 @@
       height: 1.25rem;
     }
     &:hover {
-      color: var(--primo-color-primored);
+      color: var(--primo-color-brand);
     }
   }
 
   button {
     transition: color 0.1s, background-color 0.1s;
     &:focus {
-      outline: 2px solid var(--primo-color-primored);
+      outline: 2px solid var(--primo-color-brand);
+    }
+    &:disabled {
+      opacity: 0.5;
+      pointer-events: none;
     }
   }
 

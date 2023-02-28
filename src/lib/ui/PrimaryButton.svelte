@@ -59,18 +59,18 @@
     border-radius: 0.25rem;
     font-weight: 400;
     font-size: 14px;
-    box-shadow: var(--primo-ring-primored);
+    box-shadow: var(--primo-ring-brand);
     color: var(--primo-color-white);
-    /* background: var(--primo-color-link); */
-    transition: background 0.1s, color 0.1s;
+    transition: box-shadow 0.1s, background 0.1s, color 0.1s;
     margin: var(--space-y, 0) var(--space-x, 0);
 
     &:hover {
-      background: var(--primo-color-primored);
+      box-shadow: var(--primo-ring-brand-thick);
     }
-    &[disabled] {
-      opacity: 0.5;
-      pointer-events: none;
+
+    &:active {
+      background: var(--primo-color-brand);
+      color: var(--primo-color-black);
     }
   }
 

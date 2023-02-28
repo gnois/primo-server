@@ -1,32 +1,38 @@
 <script>
   import { onMount } from 'svelte'
   import { fade } from 'svelte/transition'
-  import { find } from 'lodash'
   import axios from 'axios'
   import auth from '../../../supabase/auth'
   import { users } from '../../../supabase/db'
   import * as actions from '../../../actions'
   import { createUser } from '../../../supabase/helpers'
   import { page } from '$app/stores'
-  import { browser } from '$app/env'
+  import { browser } from '$app/environment'
 
   import Spinner from '$lib/ui/Spinner.svelte'
   import PrimaryButton from '$lib/ui/PrimaryButton.svelte'
-  import Logo from '$lib/ui/Logo.svelte'
+  import { config } from '../../../stores'
   import user from '../../../stores/user'
   import { sitePassword } from '../../../stores/misc'
 
   export let onSignIn = () => {}
 
+  let loading = true
   if (browser) {
-    axios.get('/api/auth.json').then(({ data }) => {
-      if (!data.initialized) {
-        signingUp = true
-      }
-    })
+    axios
+      .get('/api/auth')
+      .then(({ data }) => {
+        loading = false
+        if (!data.initialized) {
+          signingUp = true
+          smallMessage = `Welcome to your new Primo Server! Enter the email address & password you'll use to administrate this server`
+        }
+      })
+      .catch((e) => {
+        console.log({ e })
+        largeMessage = `Could not connect to your Supabase instance. Ensure you've followed the setup directions in the <a style="text-decoration:underline" href="https://github.com/primo-af/primo/tree/master/server">Primo Server repo</a>.`
+      })
   }
-
-  let loading
 
   let collaboratorRole = $page.url.searchParams.get('role')
   $sitePassword = $page.url.searchParams.get('password')
@@ -34,91 +40,138 @@
   $: newSignup = $page.url.searchParams.get('signup') === ''
   $: invitationKey = $page.url.searchParams.get('key')
   $: newSignup && invitationKey && signUpWithPassword()
-  $: !newSignup && $sitePassword && signIntoPageWithPassword()
+  $: if (newSignup && $sitePassword) {
+    signingUp = true
+    headerMessage = `You've been invited to collaborate on this site. Sign up to continue.`
+  }
 
   $: if ($user.signedIn) {
     onSignIn()
   }
 
   async function signUpWithPassword() {
-    loginError = `You've been invited to collaborate on this server. Sign up with any email address and password to continue.`
+    smallMessage = `You've been invited to collaborate on this server. Sign up with any email address and password to continue.`
     signingUp = true
   }
 
   async function signIntoPageWithPassword() {
-    loginMessage = `Signing you in...`
-    const validated = await actions.sites.validatePassword(
-      $page.params.site,
-      $sitePassword
-    )
-    if (validated) {
-      user.update((u) => ({
-        ...u,
+    const siteID = $page.params.site
+    // if password exists, show signup form for email and password
+
+    // on submit, create and validate new user with password
+    const valid = await actions.sites.addUser({
+      site: siteID,
+      password: $sitePassword,
+      user: {
+        email,
+        password,
         role: collaboratorRole,
-        signedIn: true,
-      }))
+      },
+    })
+
+    // on success, sign in
+    if (valid) {
+      auth.signIn({ email, password })
+      replaceStateWithQuery({
+        signup: null,
+        role: null,
+        password: null,
+      })
     } else {
-      loginMessage = `Could not validate your password, please ask the site admin for a new collaboration link`
+      largeMessage = `Could not validate your password, please ask the site admin for a new collaboration link`
     }
+
+    function replaceStateWithQuery(values) {
+      const url = new URL(window.location.toString())
+      for (let [k, v] of Object.entries(values)) {
+        if (!!v) {
+          url.searchParams.set(encodeURIComponent(k), encodeURIComponent(v))
+        } else {
+          url.searchParams.delete(k)
+        }
+      }
+      history.replaceState({}, '', url)
+    }
+
+    // const validated = await actions.sites.validatePassword(
+    //   $page.params.site,
+    //   $sitePassword
+    // )
+    // if (validated) {
+    //   user.update((u) => ({
+    //     ...u,
+    //     role: collaboratorRole,
+    //     signedIn: true,
+    //   }))
+    // } else {
+    //   largeMessage = `Could not validate your password, please ask the site admin for a new collaboration link`
+    // }
   }
 
-  let loginMessage
+  let largeMessage
   let headerMessage
-  let loginError
+  let smallMessage
   let loadingEmail
 
   let email,
     password = ''
-  $: signInWithMagicLink = !signingUp && email && !password
-  $: disabled = !signInWithMagicLink && (!email || password.length <= 3)
+  $: disabled = !email || password.length <= 3
 
   async function signUp() {
+    if ($sitePassword) {
+      signIntoPageWithPassword()
+      return
+    }
+
     loadingEmail = true
-    loginError = null
-    loginMessage = null
+    smallMessage = null
+    largeMessage = null
     const res = await createUser({
       email,
       password,
       role: collaboratorRole,
       invitationKey,
     })
+
     if (!res) {
-      loginMessage =
+      largeMessage =
         'Could not sign up. Ask the server Admin to send you a new invitation link.'
-    } else {
+    } else if (res.success) {
+      window.history.pushState('', document.title, window.location.origin) // remove query params from url
       signIn()
+    } else {
+      largeMessage =
+        'Something strange happened. Feel free to file a <a href="https://github.com/primodotso/primo/issues/new?assignees=&labels=&template=bug_report.md&title=">bug report</a> or ask for help in the Discord'
     }
     loadingEmail = false
   }
 
   async function signIn() {
-    loginError = ''
+    smallMessage = ''
     loadingEmail = true
-
     if (!$user.signedIn) {
-      const { error, user: res } = await auth.signIn({ email, password })
-      user.update((u) => ({ ...u, signedIn: true }))
-      const role = find(await users.get(), ['email', email])['role']
+      const { error } = await auth.signIn({ email, password })
       if (error) {
-        loginError = error.message
-      } else if (signInWithMagicLink) {
-        loginMessage = `A magic link has been sent to <strong>${email}</strong>.<br>When you click on it, you'll be logged into primo.`
-      } else if (res) {
-        user.update((u) => ({
-          ...u,
-          admin: role === 'admin',
-          role: role === 'admin' ? 'developer' : role,
-        }))
+        smallMessage = error.message
+      } else if ($page.params.site) {
+        // kick out if user doesn't have access to site
+        const [u] = await users.get(null, '*', email)
+        const sites = JSON.parse(u.sites)
+        if (Array.isArray(sites) && !sites.includes($page.params.site)) {
+          await auth.signOut()
+          window.location.reload()
+        }
       }
     }
+    loadingEmail = false
   }
 
   async function resetPassword() {
     const { error } = await auth.resetPassword(email)
     if (error) {
-      loginError = error.message
+      smallMessage = error.message
     } else {
-      loginMessage = `A link has been sent to <strong>${email}</strong> with instructions to reset your password`
+      largeMessage = `A link has been sent to <strong>${email}</strong> with instructions to reset your password`
     }
   }
 
@@ -130,15 +183,16 @@
 
 {#key signingUp}
   <main class="primo-modal primo-reset" in:fade>
-    <div class="logo">
-      <a href="https://primo.af" target="blank" xyz="fade">
-        <Logo />
-      </a>
+    <div class="logo" xyz="fade">
+      <img
+        src={$config.customization.logo.url}
+        alt={$config.customization.logo.alt}
+      />
     </div>
 
-    {#if loginMessage}
+    {#if largeMessage}
       <div in:fade class="login-message">
-        {@html loginMessage}
+        {@html largeMessage}
       </div>
     {:else if loading}
       <div class="spinner">
@@ -146,8 +200,8 @@
       </div>
     {:else}
       <div class="login-form">
-        {#if loginError}
-          <span class="login-error" in:fade>{@html loginError}</span>
+        {#if smallMessage}
+          <span class="login-error" in:fade>{@html smallMessage}</span>
         {/if}
         {#if headerMessage}
           <div class="header-message">
@@ -184,35 +238,31 @@
             </div>
           </div>
 
-          {#key signInWithMagicLink}
-            <PrimaryButton
-              disabled={disabled || loadingEmail}
-              loading={loadingEmail}
-              on:click={signingUp ? signUp : signIn}
-              type="submit"
+          <PrimaryButton
+            disabled={disabled || loadingEmail}
+            loading={loadingEmail}
+            on:click={signingUp ? signUp : signIn}
+            type="submit"
+          >
+            <svg
+              slot="icon"
+              fill="currentColor"
+              viewBox="0 0 20 20"
+              xmlns="http://www.w3.org/2000/svg"
+              ><path
+                d="M2.003 5.884L10 9.882l7.997-3.998A2 2 0 0016 4H4a2 2 0 00-1.997 1.884z"
+              /><path
+                d="M18 8.118l-8 4-8-4V14a2 2 0 002 2h12a2 2 0 002-2V8.118z"
+              /></svg
             >
-              <svg
-                slot="icon"
-                fill="currentColor"
-                viewBox="0 0 20 20"
-                xmlns="http://www.w3.org/2000/svg"
-                ><path
-                  d="M2.003 5.884L10 9.882l7.997-3.998A2 2 0 0016 4H4a2 2 0 00-1.997 1.884z"
-                /><path
-                  d="M18 8.118l-8 4-8-4V14a2 2 0 002 2h12a2 2 0 002-2V8.118z"
-                /></svg
-              >
-              <span slot="label">
-                {#if signingUp}
-                  <span>Sign up with Email</span>
-                {:else if signInWithMagicLink}
-                  <span>Sign in with magic link</span>
-                {:else}
-                  <span>Sign in</span>
-                {/if}
-              </span>
-            </PrimaryButton>
-          {/key}
+            <span slot="label">
+              {#if signingUp}
+                <span>Sign up with Email</span>
+              {:else}
+                <span>Sign in</span>
+              {/if}
+            </span>
+          </PrimaryButton>
           <div class="secondary">
             {#if !signingUp}
               <button type="button" on:click={resetPassword}>
@@ -268,39 +318,32 @@
       display: flex;
       justify-content: center;
 
-      a {
-        width: 16rem;
-        padding: 0 2rem;
-        opacity: 1;
-        transition: opacity 0.2s;
-
-        &:hover {
-          opacity: 0.75;
-        }
+      img {
+        max-height: 4rem;
+        max-width: 200px;
+        object-fit: contain;
       }
     }
 
     .login-message {
       border-radius: 0.25rem;
       padding: 1.5rem;
-      margin-bottom: 1.5rem;
       font-size: 0.875rem;
       line-height: 1.25rem;
       text-align: center;
       font-weight: 600;
+    }
 
-      .spinner {
-        display: flex;
-        justify-content: center;
-        margin-bottom: 0.5rem;
-      }
+    .spinner {
+      display: flex;
+      justify-content: center;
+      padding: 2rem 0;
     }
 
     .login-error {
       display: block;
-      padding: 1rem;
+      padding: 1rem 0;
       border-radius: 0.25rem;
-      font-weight: 600;
       margin-bottom: 1rem;
       border: 2px solid var(--color-caution);
     }
@@ -367,11 +410,6 @@
         button:hover {
           color: var(--color-primored);
         }
-
-        .switch {
-          margin-left: auto;
-          text-decoration: underline;
-        }
       }
 
       --Spinner-size: 1rem;
@@ -385,12 +423,12 @@
       }
     }
 
-    hr {
+    /* hr {
       margin: 1rem 0;
       border-color: var(--color-gray-8);
-    }
+    } */
 
-    .providers {
+    /* .providers {
       --color-link: var(--color-gray-8);
       --color-link-hover: var(--color-primored-dark);
 
@@ -398,6 +436,6 @@
         margin-right: 0.5rem;
         width: 1.25rem;
       }
-    }
+    } */
   }
 </style>

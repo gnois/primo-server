@@ -1,9 +1,9 @@
 <script>
-  import { browser } from '$app/env'
+  import { browser } from '$app/environment'
   import { find as _find } from 'lodash-es'
   import Spinner from '$lib/ui/Spinner.svelte'
   import { downloadPagePreview } from '../../supabase/storage'
-  import { buildStaticPage } from '@primo-app/primo/src/stores/helpers'
+  import { buildStaticPage } from '@primo-app/primo/stores/helpers'
 
   export let site = null
   export let preview = null
@@ -23,17 +23,17 @@
   }
 
   async function getPreview(site) {
-    generatedPreview =
-      (await downloadPagePreview(site.id)) ||
-      (await buildStaticPage({
-        page: _find(site.pages, ['id', 'index']),
-        site,
-      }))
-
-    if (!generatedPreview) {
-      valid = false
-    } else {
+    try {
+      generatedPreview =
+        (await downloadPagePreview(site.id)) ||
+        (await buildStaticPage({
+          page: _find(site.pages, ['id', 'index']),
+          site,
+        }))
+    } catch (e) {
+      generatedPreview = '<div></div>'
       valid = true
+      console.warn('Could not retrieve site preview')
     }
   }
 

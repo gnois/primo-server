@@ -4,7 +4,9 @@
   import TextField from '$lib/ui/TextField.svelte'
   import PrimaryButton from '$lib/ui/PrimaryButton.svelte'
   import { makeValidUrl } from '$lib/utils'
-  import { Site } from '@primo-app/primo/src/const'
+  import { Site } from '@primo-app/primo/const'
+  import Icon from '@iconify/svelte'
+  import { validateSiteStructure } from '@primo-app/primo/utils'
 
   export let onSuccess = (newSite) => {}
   let loading
@@ -40,12 +42,18 @@
   let duplicatingSite = false
   let duplicateFileIsValid = true
   function readJsonFile({ target }) {
-    console.log('reading')
     var reader = new window.FileReader()
     reader.onload = async function ({ target }) {
-      console.log('loaded')
       if (typeof target.result !== 'string') return
-      siteData = JSON.parse(target.result)
+
+      const uploaded = JSON.parse(target.result)
+      const converted = validateSiteStructure(uploaded)
+
+      if (converted) siteData = converted
+      else {
+        duplicateFileIsValid = false
+      }
+
       duplicatingSite = true
     }
     reader.readAsText(target.files[0])
@@ -75,41 +83,35 @@
           <SiteThumbnail bind:valid={duplicateFileIsValid} site={siteData} />
         </div>
       {/if}
-      <div id="upload-json">
-        <label>
-          <input
-            on:change={readJsonFile}
-            type="file"
-            id="primo-json"
-            accept=".json"
-          />
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            viewBox="0 0 20 20"
-            fill="currentColor"
-          >
-            <path
-              fill-rule="evenodd"
-              d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM6.293 6.707a1 1 0 010-1.414l3-3a1 1 0 011.414 0l3 3a1 1 0 01-1.414 1.414L11 5.414V13a1 1 0 11-2 0V5.414L7.707 6.707a1 1 0 01-1.414 0z"
-              clip-rule="evenodd"
+      <footer>
+        <div id="upload-json">
+          <label class="container">
+            <input
+              on:change={readJsonFile}
+              type="file"
+              id="primo-json"
+              accept=".json"
             />
-          </svg>
-          <span>Duplicate from primo.json</span>
-        </label>
-      </div>
-      {#if duplicateFileIsValid}
-        <div class="submit">
-          <PrimaryButton
-            type="submit"
-            label={duplicatingSite ? 'Duplicate' : 'Create'}
-            disabled={!canCreateSite}
-          />
+            <Icon icon="carbon:upload" />
+            <span>Duplicate from primo.json</span>
+          </label>
         </div>
-      {/if}
+        <a class="container" href="https://primo.so/marketplace" target="blank">
+          <Icon icon="gridicons:themes" />
+          <span>Primo Themes</span>
+        </a>
+      </footer>
+      <div class="submit">
+        <PrimaryButton
+          type="submit"
+          label={duplicatingSite ? 'Duplicate' : 'Create'}
+          disabled={!canCreateSite && duplicateFileIsValid}
+        />
+      </div>
     </form>
   {:else}
     <div class="creating-site">
-      <span>{duplicatingSite ? 'Creating' : 'Duplicating'} {siteName}</span>
+      <span>{duplicatingSite ? 'Duplicating' : 'Creating'} {siteName}</span>
       {#key message}
         <p>{message}</p>
       {/key}
@@ -131,18 +133,21 @@
         --color-link: var(--color-primored);
       }
     }
-
-    details {
-      margin-bottom: 1.5rem;
-
-      summary {
-        margin-bottom: 0.5rem;
-        &:focus {
-          outline: 0;
-          cursor: pointer;
-          font-size: var(--font-size-2);
-        }
-      }
+  }
+  footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    .container {
+      margin-bottom: 1rem;
+      display: flex;
+      align-items: center;
+      gap: 0.25rem;
+    }
+    span {
+      color: var(--color-gray-3);
+      font-size: 0.75rem;
+      text-decoration: underline;
     }
   }
   #upload-json {
@@ -152,10 +157,6 @@
 
     label {
       cursor: pointer;
-      margin-bottom: 1rem;
-      display: flex;
-      align-items: center;
-      gap: 0.25rem;
 
       input {
         display: none;
